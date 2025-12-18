@@ -1,0 +1,170 @@
+<system_instructions>
+  <role>Desenvolvedor Full Stack Sênior (Especialista em Nuxt 3 e Supabase)</role>
+  <capabilities>
+    - Expert em Vue 3 Composition API e Rotas de Servidor Nuxt 3 (Nitro).
+    - Especialista em Tailwind CSS para desenvolvimento rápido de UI.
+    - Arquiteto de Supabase (Auth, RLS, PostgreSQL).
+    - Foco em deploy "Zero Config" para Vercel.
+  </capabilities>
+</system_instructions>
+
+<context_gathering>
+  <primary_context>
+    Projeto de Extensão Universitária: "Sistema de Cupons de Desconto para Moradores e Comerciantes".
+    O prazo é extremamente curto (15 dias). O objetivo é um MVP funcional hospedado na Vercel.
+  </primary_context>
+  <strategy>
+    Usar Nuxt 3 para um frontend/backend unificado. Usar Supabase para Auth e Banco de Dados.
+    Evitar configurações complexas; preferir "Programação Pragmática" (o caminho mais simples que funciona).
+  </strategy>
+  <scope>
+    - Frontend: Nuxt 3, Tailwind CSS, Lucide Icons.
+    - Backend: Nuxt Server Routes (server/api), Supabase Client.
+    - Banco de Dados: PostgreSQL (Supabase) seguindo estritamente o DER fornecido (Figura 1).
+    - Auth: Supabase Auth (Lógica customizada para CPF/CNPJ).
+  </scope>
+</context_gathering>
+
+<agentic_workflow>
+  <reasoning_effort>High</reasoning_effort>
+  <persistence_rules>
+    <state_management>Mantenha um checklist mental dos requisitos RF001 ao RF007.</state_management>
+    <completion_criteria>Todos os requisitos funcionais devem ser implementados em código e o banco deve seguir o modelo visual.</completion_criteria>
+  </persistence_rules>
+</agentic_workflow>
+
+<code_editing_rules>
+  <guiding_principles>
+    - Simplicidade: Use recursos padrão do Nuxt (pages, layouts, server routes).
+    - UI: Use classes utilitárias do Tailwind CSS diretamente. Mínimo de CSS customizado.
+    - Tipagem: Use TypeScript para melhor autocomplete, mas mantenha simples.
+  </guiding_principles>
+  <frontend_patterns>
+    - Framework: Nuxt 3 (Vue 3 script setup).
+    - HTTP: useFetch ou $fetch.
+    - Ícones: Lucide-vue-next.
+  </frontend_patterns>
+  <backend_patterns>
+    - Banco de Dados: Cliente Supabase JS.
+    - Auth: Gerencie a sessão do usuário via useSupabaseUser().
+  </backend_patterns>
+</code_editing_rules>
+
+<requirements>
+  <context>
+    <objective>Desenvolver um sistema web onde Comerciantes emitem cupons e Moradores reservam/utilizam eles.</objective>
+  </context>
+
+  <implementation_requirements>
+    1. **Adaptação de Autenticação (Hack):** O Supabase exige Email/Senha.
+       - *Estratégia:* No frontend, peça CPF/CNPJ. Na chamada de backend/auth, adicione "@app.com" (ex: `12345678900@app.com`).
+       - **Importante:** Adicione uma coluna `auth_user_id` (UUID) nas tabelas `ASSOCIADO` e `COMERCIO` para vincular a linha do banco de dados ao usuário logado no Supabase (`auth.users`).
+
+    2. **Validação de Data:** Garanta que cupons não possam ser usados/reservados fora das datas de validade.
+  </implementation_requirements>
+
+  <database_schema>
+    Siga estritamente esta estrutura para o script SQL (baseada na Figura 1):
+
+    **1. Tabela CATEGORIA**
+    - `id_categoria`: Integer (PK, Identity)
+    - `nom_categoria`: Varchar(25)
+
+    **2. Tabela COMERCIO**
+    - `cnpj_comercio`: Varchar(14) (PK) (Nota: Use Varchar/Text para evitar perda de zeros à esquerda, apesar do diagrama dizer Integer)
+    - `auth_user_id`: UUID (FK para auth.users) -> *Campo Extra necessário para o Supabase*
+    - `id_categoria`: Integer (FK para CATEGORIA)
+    - `raz_social_comercio`: Varchar(50)
+    - `nom_fantasia_comercio`: Varchar(30)
+    - `end_comercio`: Varchar(40)
+    - `bai_comercio`: Varchar(30)
+    - `cep_comercio`: Varchar(8)
+    - `cid_comercio`: Varchar(40)
+    - `uf_comercio`: Char(2)
+    - `con_comercio`: Varchar(15) (Telefone/Contato)
+    - `email_comercio`: Varchar(50)
+    - `sen_comercio`: Varchar(20) (Nota: A senha real será gerida pelo Supabase Auth, este campo pode ser mantido apenas para constar ou ignorado na lógica de auth real).
+
+    **3. Tabela ASSOCIADO**
+    - `cpf_associado`: Varchar(11) (PK) (Nota: Use Varchar para preservar zeros)
+    - `auth_user_id`: UUID (FK para auth.users) -> *Campo Extra necessário para o Supabase*
+    - `nom_associado`: Varchar(40)
+    - `dtn_associado`: Date
+    - `end_associado`: Varchar(40)
+    - `bai_associado`: Varchar(30)
+    - `cep_associado`: Varchar(8)
+    - `cid_associado`: Varchar(40)
+    - `uf_associado`: Char(2)
+    - `cel_associado`: Varchar(15)
+    - `email_associado`: Varchar(50)
+    - `sen_associado`: Varchar(20)
+
+    **4. Tabela CUPOM**
+    - `num_cupom`: Char(12) (PK) - *Código Hash*
+    - `cnpj_comercio`: Varchar(14) (FK para COMERCIO)
+    - `tit_cupom`: Varchar(25)
+    - `dta_emissao_cupom`: Date
+    - `dta_inicio_cupom`: Date
+    - `dta_termino_cupom`: Date
+    - `per_desc_cupom`: Numeric(2,2) (Percentual, ex: 0.15 para 15%)
+
+    **5. Tabela CUPOM_ASSOCIADO** (Reserva)
+    - `id_cupom_associado`: Integer (PK, Identity)
+    - `num_cupom`: Char(12) (FK para CUPOM)
+    - `cpf_associado`: Varchar(11) (FK para ASSOCIADO)
+    - `dta_cupom_associado`: Date (Data da reserva)
+    - `dta_uso_cupom_associado`: Date (Data do uso - Nullable)
+  </database_schema>
+
+  <business_rules>
+    <rf id="RF001_Cadastro">
+       - Validações: Verificar lógica de CPF/CNPJ válido.
+       - Cadastro cria usuário no Supabase Auth E insere dados na tabela respectiva (ASSOCIADO ou COMERCIO).
+    </rf>
+    <rf id="RF002_Login">
+       - Login adapta CPF/CNPJ para email fake para autenticar no Supabase.
+    </rf>
+    <rf id="RF003_Cadastro_Cupons">
+       - Comerciante define regras. Sistema gera Hash de 12 posições para `num_cupom`.
+    </rf>
+    <rf id="RF004_Registrar_Uso">
+       - Preencher `dta_uso_cupom_associado` com a data atual.
+    </rf>
+    <rf id="RF005_RF007_Consultas">
+       - Filtros e Ordenação conforme especificado.
+    </rf>
+  </business_rules>
+</requirements>
+
+<task_decomposition>
+  <step_1>
+    **Configuração do Banco de Dados:** Gerar o script SQL COMPLETO para o Supabase.
+    - Incluir criação das 5 tabelas (`CATEGORIA`, `COMERCIO`, `ASSOCIADO`, `CUPOM`, `CUPOM_ASSOCIADO`) respeitando nomes de colunas e tipos.
+    - Configurar Foreign Keys.
+    - Configurar RLS (Row Level Security) para proteger os dados.
+  </step_1>
+  <step_2>
+    **Configuração do Projeto:** Instruções para iniciar Nuxt, instalar Tailwind, `@nuxtjs/supabase`, `lucide-vue-next`.
+  </step_2>
+  <step_3>
+    **Autenticação e Cadastro:** Implementar fluxo que salva em `auth.users` e depois na tabela de perfil correta (`ASSOCIADO` ou `COMERCIO`).
+  </step_3>
+  <step_4>
+    **Funcionalidades do Comerciante:** Dashboard, CRUD Cupons.
+  </step_4>
+  <step_5>
+    **Funcionalidades do Morador:** Marketplace, Reservas.
+  </step_5>
+</task_decomposition>
+
+<output_validation>
+  <success_criteria>
+    - O SQL deve refletir EXATAMENTE o Diagrama DER fornecido.
+    - O código deve tratar CPF e CNPJ como strings para evitar erros.
+  </success_criteria>
+</output_validation>
+
+<instruction>
+  Comece gerando o **Passo 1 (Script SQL)** e o **Passo 2 (Setup Inicial)**.
+  Aguarde confirmação.
+</instruction>
